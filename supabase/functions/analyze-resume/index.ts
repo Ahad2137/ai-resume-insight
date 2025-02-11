@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.fresh.dev/server/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
@@ -18,8 +19,10 @@ serve(async (req) => {
       throw new Error('Failed to fetch PDF file');
     }
     
-    // Convert PDF to text (simplified for demo)
-    const pdfText = await pdfResponse.text();
+    // Convert PDF content to base64 string for API
+    const pdfBuffer = await pdfResponse.arrayBuffer();
+    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+    const pdfText = `Base64 encoded PDF content: ${pdfBase64}`;
 
     // Get OpenAI API key from environment
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
@@ -64,12 +67,12 @@ serve(async (req) => {
     const analysis = JSON.parse(completion.choices[0].message.content);
 
     // Store the analysis in the database
-    const { data: client } = await createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    await client
+    await supabaseClient
       .from('resume_analyses')
       .insert({
         file_path: fileUrl,
