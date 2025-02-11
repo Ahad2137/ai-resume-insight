@@ -22,49 +22,64 @@ serve(async (req) => {
     // Convert PDF content to base64 string for API
     const pdfBuffer = await pdfResponse.arrayBuffer();
     const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
-    const pdfText = `Base64 encoded PDF content: ${pdfBase64}`;
 
-    // Get OpenAI API key from environment
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) {
-      throw new Error('OpenAI API key not found');
-    }
-
-    // Call OpenAI API
-    const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call APILayer PDF to Text API
+    const apiLayerResponse = await fetch('https://api.apilayer.com/pdf_to_text/url', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAiKey}`,
+        'apikey': Deno.env.get('APILAYER_API_KEY') ?? '',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a professional resume analyzer. Analyze the resume and provide:
-              1. A brief summary of the candidate's profile
-              2. Key strengths (3-5 points)
-              3. Suggested improvements (2-3 points)
-              4. Important keywords/skills found in the resume
-              Format the response as a JSON object with these keys: summary, strengths (array), improvements (array), keywords (array)`
-          },
-          {
-            role: 'user',
-            content: pdfText
-          }
-        ]
+        url: fileUrl
       })
     });
 
-    if (!openAiResponse.ok) {
-      const error = await openAiResponse.json();
-      console.error('OpenAI API error:', error);
-      throw new Error('Failed to analyze resume');
+    if (!apiLayerResponse.ok) {
+      const error = await apiLayerResponse.json();
+      console.error('APILayer error:', error);
+      throw new Error('Failed to extract text from resume');
     }
 
-    const completion = await openAiResponse.json();
-    const analysis = JSON.parse(completion.choices[0].message.content);
+    const extractedText = await apiLayerResponse.text();
+    console.log('Extracted text:', extractedText);
+
+    // Call APILayer Resume Parser API
+    const resumeParserResponse = await fetch('https://api.apilayer.com/resume_parser/url', {
+      method: 'POST',
+      headers: {
+        'apikey': Deno.env.get('APILAYER_API_KEY') ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: fileUrl
+      })
+    });
+
+    if (!resumeParserResponse.ok) {
+      const error = await resumeParserResponse.json();
+      console.error('Resume Parser error:', error);
+      throw new Error('Failed to parse resume');
+    }
+
+    const parsedData = await resumeParserResponse.json();
+    console.log('Parsed resume data:', parsedData);
+
+    // Format the response
+    const analysis = {
+      summary: parsedData.professional_summary || "Professional summary not available",
+      strengths: [
+        parsedData.skills?.slice(0, 5) || [],
+        parsedData.certifications || [],
+        parsedData.accomplishments || []
+      ].flat().slice(0, 5),
+      improvements: [
+        "Consider adding more quantifiable achievements",
+        "Ensure all dates are in consistent format",
+        "Add relevant certifications if applicable"
+      ],
+      keywords: parsedData.skills || []
+    };
 
     // Store the analysis in the database
     const supabaseClient = createClient(
