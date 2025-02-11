@@ -92,7 +92,7 @@ serve(async (req) => {
       .from('resume_analyses')
       .insert({
         file_path: fileUrl,
-        analysis_text: JSON.stringify(analysis)
+        analysis_text: analysis
       });
 
     if (dbError) {
