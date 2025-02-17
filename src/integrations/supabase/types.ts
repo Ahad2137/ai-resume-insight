@@ -9,33 +9,7 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      resume_analyses: {
-        Row: {
-          analysis_text: string | null
-          created_at: string | null
-          file_path: string
-          id: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          analysis_text?: string | null
-          created_at?: string | null
-          file_path: string
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          analysis_text?: string | null
-          created_at?: string | null
-          file_path?: string
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
